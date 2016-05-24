@@ -75,6 +75,8 @@ $ ls tmp/
 
 ## Mapping Mode
 
+![](images/Encounters.png)
+
 The aim of this **Mapping Mode** is to allow us to *map* access points closer to each metro/train station. To use it, add the flag *-m* to the execution line. For example:
 
 ```
@@ -90,7 +92,7 @@ Initial state: STOPPED
 ...
 ```
 
-The script considers that the initial *state* you are in is STOPPED. To change *state*, hit any key on they keyboard (e.g.: SPACE or ENTER). These states refer to:
+The script considers that the initial *state* you are in is STOPPED. To change *state*, hit any key on your keyboard (e.g.: SPACE or ENTER). These states refer to:
 * MOVING: any given moment when you are inside the train/metro with the doors closed. Any other moment should be STOPPED, as described below.
 * STOPPED: if the train/metro is not moving and has its doors open, allowing passengers to go in and out, or you are waiting outside for a new train, or you are walking from one platform to another. In case it stops between stations, DO NOT change it to STOPPED.
 
