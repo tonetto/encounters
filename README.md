@@ -108,7 +108,7 @@ We recommend the use of this Channel Hopping option along with Mapping Mode.
 
 ## Channel Hopping
 
-[]!(images/wifi_channels.png)
+![](images/wifi_channels.png)
 
 This allows us to control and change periodically the channel to which your wifi card is listening to. Note that on OS X this will force your WiFi card to disconnect from any access point it could have been connected at the moment. Please consider using this option since it allows us to cover all the available spectrum as well as maximizes the chances of logging from different sources.
 
