@@ -2,7 +2,7 @@
 
 Captures Management Frames using *tcpdump*.
 
-## Dependencies
+## Installation
 
 ### Linux
 
@@ -17,7 +17,18 @@ sudo setcap "CAP_NET_RAW+eip" /usr/sbin/tcpdump
 
 ### OS X
 
-*tcpdump* should already be available.
+*tcpdump* should already be available. To allow channel hopping, run the following:
+
+```
+sudo ln -s /System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport /usr/local/sbin/airport
+sudo visudo
+```
+
+At the following line to the end of your */etc/sudoers* file:
+
+```
+%sudo ALL=NOPASSWD: /usr/local/sbin/airport
+```
 
 ### Testing before running
 
@@ -83,7 +94,7 @@ The script considers that the initial *state* you are in is STOPPED. To change *
 * MOVING: any given moment when you are inside the train/metro with the doors closed. Any other moment should be STOPPED, as described below.
 * STOPPED: if the train/metro is not moving and has its doors open, allowing passengers to go in and out, or you are waiting outside for a new train, or you are walking from one platform to another. In case it stops between stations, DO NOT change it to STOPPED.
 
-Also note that, as you hit a new key, the new state should be printed on the console.
+Also note that, as you hit a new key, the new state should be printed on the console. You MUST have the console in which the script is running for it to work. This script will not capture keyboard events otherwise.
 
 This will create a separate file inside the same output directory. For example:
 ```
@@ -93,4 +104,4 @@ $ ls tmp/
 
 ## Further instructions
 
-Please contact me.
+As soon as you run this, please send to me files that were created. For any further questions, please just ask.
