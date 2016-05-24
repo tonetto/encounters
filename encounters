@@ -15,106 +15,170 @@
 ##
 ## author: Leonardo Tonetto
 
-# trap ctrl-c and call ctrl_c()
-trap ctrl_c INT
+trap 'kill_children_exit $WAITPID' EXIT
 
-function ctrl_c() {
-  >&2 echo "Exiting..."
-  exit
+function kill_children_exit
+{
+    echo "Exiting..."
+    while [ "$1" != "" ];
+    do
+        kill $1 2>/dev/null
+        shift
+    done
+    exit
 }
 
 function usage
 {
-    echo "usage: encounter -o </output/path> -i <wlan0> [-m]| [-h]"
-    echo "                 -o | --output:  /output/path for tcpdump"
+    echo "usage: encounter -o </output/path> -i <wlan0> [-m] [-c] | [-h]"
+    echo ""
+    echo "                 -o | --output:    /output/path for tcpdump"
     echo "                 -i | --interface: <wlan0> interface"
-    echo "                 -m | --mapping: mapping mode (check README)"
-    echo "                 -h | --help: shows this message"
+    echo "                 -m | --mapping:   mapping mode (check README)"
+    echo "                 -h | --help:      shows this message"
+    echo "                 -c | --chanhop:   Channel Hopper (check README)"
 }
 
-if [[ ! -x /usr/sbin/tcpdump ]]; then
-  >&2 echo "Please install tcpdump and try again. Check README file for instructions."
-  exit 1
+
+function channel_hopper
+{
+    c_seq="1 4 7 10 13 2 5 8 11 14 3 6 9 12"
+    case `uname` in
+        "Linux")
+            # Figure out how to do this in Linux
+            ;;
+        "Darwin")
+            # we'll use airport for this
+            while true;
+            do
+                for channel in $c_seq;
+                do
+                    sudo airport --channel=$channel
+                    sleep 5
+                done
+            done
+            ;;
+    esac
+}
+
+if [[ ! -x /usr/sbin/tcpdump ]];
+then
+    >&2 echo "Please install tcpdump and try again. Check README file for instructions."
+    exit 1
 fi
 
 interface=
 output_path=./
 mapping=
-while [ "$1" != "" ]; do
-  case $1 in
-    -i | --interface) shift
-                      interface=$1
-                      ;;
-    -o | --output )   shift
-                      output_path=$1
-                      ;;
-    -h | --help )     usage
-                      exit
-                      ;;
-    -m | --mapping )  shift
-                      mapping=1
-                      ;;
-    * )               usage
-                      exit 1
-                      ;;
-  esac
-  shift
+channel_hopping=0
+while [ "$1" != "" ];
+do
+    case $1 in
+        -i | --interface)
+            shift
+            interface=$1
+            ;;
+        -o | --output )
+            shift
+            output_path=$1
+            ;;
+        -h | --help )
+            usage
+            exit
+            ;;
+        -m | --mapping )
+            mapping=1
+            ;;
+        -c | --chanhop )
+            channel_hopping=1
+            ;;
+        * )
+            usage
+            exit 1
+            ;;
+    esac
+    shift
 done
 
+>&2 echo "To quit, press Q"
 echo "Found the following Wireless interfaces:"
 case `uname` in
-  "Linux")
-  for intrfc in `iw dev | grep Interface | awk '{print $2}'`; do echo $interfc; done
-  ;;
-  "Darwin")
-  networksetup listallhardwareports | grep "Wi-Fi" -A1 | grep "Device" | awk '{print $2}'
-  ;;
+    "Linux")
+        for intrfc in `iw dev | grep Interface | awk '{print $2}'`; do echo $interfc; done
+        ;;
+    "Darwin")
+        networksetup listallhardwareports | grep "Wi-Fi" -A1 | grep "Device" | awk '{print $2}'
+        if [[ $channel_hopping -eq 1 ]];
+        then
+            >&2 echo "Disassociating WiFi"
+            sudo airport -z            
+        fi
+        ;;
 esac
 
-if [[ -z $interface ]]; then
-  >&2 echo "Please indicate the desired network interface"
-  usage
-  exit 1
+if [[ -z $interface ]];
+then
+    >&2 echo "Please indicate the desired network interface"
+    usage
+    exit 1
 fi
 
-if [[ ! -d "$output_path" ]]; then
-  >&2 echo "Please indicate a valid output path"
-  usage
-  exit 1
+if [[ ! -d "$output_path" ]];
+then
+    >&2 echo "Please indicate a valid output path"
+    usage
+    exit 1
 fi
+
 
 ## Timestamp function
 timestamp=$(date +'%s')
 ## Some output for debug
 echo "Calling TCPDUMP on interface $interface."
 
-if [[ mapping -eq 1 ]]; then
-  echo "Mode: Mapping"
-  tcpdump -i $interface -I -w $output_path/$timestamp.capture type mgt &
-  tcpdump_pid=$!
+WAITPID=
+tcpdump -i $interface -I -w $output_path/$timestamp.capture type mgt &
+WAITPID="$WAITPID $!"
+channel_hopper_pid=
+if [[ $channel_hopping -eq 1 ]];
+then
+    echo "Channel Hopping"
+    channel_hopper &
+    WAITPID="$WAITPID $!"
+fi
+
+if [[ mapping -eq 1 ]];
+then
+    echo "Mode: Mapping"
 else
-  tcpdump -i $interface -I -w $output_path/$timestamp.capture type mgt
-  exit
+    while true; do
+        read -n 1 -s key
+        if [[ $key = q ]];
+        then
+            kill_children_exit $WAITPID
+        fi
+    done
+    wait
 fi
 
 
 state='STOPPED'
-echo "Initial state: $state"
-while read -n 1 -s key; do
-  if [[ $key != q ]];
-  then
-    if [[ "$state" = 'STOPPED' ]]; then
-      state='MOVING'
+>&2 echo "Initial state: $state"
+while true; do
+    read -n 1 -s key
+    
+    if [[ $key = q ]];
+    then
+        kill_children_exit $WAITPID
     else
-      state='STOPPED'
+        if [[ "$state" = 'STOPPED' ]]; then
+            state='MOVING'
+        else
+            state='STOPPED'
+        fi
+        echo "New state: $state !"
+        current_ts=$(date +"%Y%m%d%H%M%S")
+        echo $current_ts $state >>$output_path/$timestamp.mapping
     fi
-    echo "New state: $state !"
-    current_ts=$(date +"%Y%m%d%H%M%S")
-    echo $current_ts $state >>$output_path/$timestamp.mapping
-  else
-    echo "Exiting..."
-    kill $tcpdump_pid
-    exit
-  fi
 done
 
