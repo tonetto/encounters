@@ -1,0 +1,120 @@
+#!/bin/bash
+
+## This program is free software; you can redistribute it and/or
+## modify it under the terms of the GNU General Public License
+## version 2 as published by the Free Software Foundation.
+##
+## This program is distributed in the hope that it will be useful,
+## but WITHOUT ANY WARRANTY; without even the implied warranty of
+## MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+## GNU General Public License for more details.
+##
+## You should have received a copy of the GNU General Public License
+## along with this program; if not, write to the Free Software
+## Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+##
+## author: Leonardo Tonetto
+
+# trap ctrl-c and call ctrl_c()
+trap ctrl_c INT
+
+function ctrl_c() {
+  >&2 echo "Exiting..."
+  exit
+}
+
+function usage
+{
+    echo "usage: encounter -o </output/path> -i <wlan0> [-m]| [-h]"
+    echo "                 -o | --output:  /output/path for tcpdump"
+    echo "                 -i | --interface: <wlan0> interface"
+    echo "                 -m | --mapping: mapping mode (check README)"
+    echo "                 -h | --help: shows this message"
+}
+
+if [[ ! -x /usr/sbin/tcpdump ]]; then
+  >&2 echo "Please install tcpdump and try again. Check README file for instructions."
+  exit 1
+fi
+
+interface=
+output_path=./
+mapping=
+while [ "$1" != "" ]; do
+  case $1 in
+    -i | --interface) shift
+                      interface=$1
+                      ;;
+    -o | --output )   shift
+                      output_path=$1
+                      ;;
+    -h | --help )     usage
+                      exit
+                      ;;
+    -m | --mapping )  shift
+                      mapping=1
+                      ;;
+    * )               usage
+                      exit 1
+                      ;;
+  esac
+  shift
+done
+
+echo "Found the following Wireless interfaces:"
+case `uname` in
+  "Linux")
+  for intrfc in `iw dev | grep Interface | awk '{print $2}'`; do echo $interfc; done
+  ;;
+  "Darwin")
+  networksetup listallhardwareports | grep "Wi-Fi" -A1 | grep "Device" | awk '{print $2}'
+  ;;
+esac
+
+if [[ -z $interface ]]; then
+  >&2 echo "Please indicate the desired network interface"
+  usage
+  exit 1
+fi
+
+if [[ ! -d "$output_path" ]]; then
+  >&2 echo "Please indicate a valid output path"
+  usage
+  exit 1
+fi
+
+## Timestamp function
+timestamp=$(date +'%s')
+## Some output for debug
+echo "Calling TCPDUMP on interface $interface."
+
+if [[ mapping -eq 1 ]]; then
+  echo "Mode: Mapping"
+  tcpdump -i $interface -I -w $output_path/$timestamp.capture type mgt &
+  tcpdump_pid=$!
+else
+  tcpdump -i $interface -I -w $output_path/$timestamp.capture type mgt
+  exit
+fi
+
+
+state='STOPPED'
+echo "Initial state: $state"
+while read -n 1 -s key; do
+  if [[ $key != q ]];
+  then
+    if [[ "$state" = 'STOPPED' ]]; then
+      state='MOVING'
+    else
+      state='STOPPED'
+    fi
+    echo "New state: $state !"
+    current_ts=$(date +"%Y%m%d%H%M%S")
+    echo $current_ts $state >>$output_path/$timestamp.mapping
+  else
+    echo "Exiting..."
+    kill $tcpdump_pid
+    exit
+  fi
+done
+
