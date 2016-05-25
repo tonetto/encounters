@@ -17,6 +17,9 @@
 
 function setup_linux
 {
+    echo "Found the following Wireless interfaces:"
+    for intrfc in `sudo iw dev | grep Interface | awk '{print $2}'`; do echo $intrfc; done
+    
     echo "[setup] Checking/Installing required packages"
     ## Check if tcpdump and iw are installed [elegant way...]
     type -P tcpdump >/dev/null && type -P iw >/dev/null && return
@@ -34,6 +37,9 @@ function setup_linux
 
 function setup_macos
 {
+    echo "Found the following Wireless interfaces:"
+    networksetup listallhardwareports | grep "Wi-Fi" -A1 | grep "Device" | awk '{print $2}'
+
     [ -h "/usr/local/sbin/airport" -o -h "/usr/local/bin/airport" ] && return
     echo "[setup] Linking airport"
     sudo ln -s /System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport /usr/local/sbin/airport
@@ -44,7 +50,20 @@ function call_visudo
     export EDITOR=$0 && sudo -E visudo 2>/dev/null
 }
 
-LINUX_SUDOERS_EDIT="%sudo ALL=NOPASSWD: /usr/sbin/tcpdump,/usr/bin/tcpdump,/sbin/iw"
+LINUX_SUDOERS_EDIT=
+## This is why Linux will never be big on personal computers...
+# Ubuntu/Debian based distros
+if [ -x "/usr/bin/apt-get" ]
+then
+    LINUX_SUDOERS_EDIT="%sudo ALL=NOPASSWD: /usr/sbin/tcpdump,/sbin/iw,/sbin/ifconfig"
+# Arch based distros
+elif [ -x "/usr/bin/pacman" ]
+then
+    LINUX_SUDOERS_EDIT="%sudo ALL=NOPASSWD: /usr/bin/tcpdump,/usr/bin/iw,/usr/bin/ifconfig"
+# Not supporting anything else for now...
+else
+    die "Sorry, your distro is not supported yet."
+fi
 MACOS_SUDOERS_EDIT="%sudo ALL=NOPASSWD: /usr/local/sbin/airport"
 
 if [ -z "$1" ]
